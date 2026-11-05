@@ -63,10 +63,13 @@ Environment: Windows 11 (MinGW GCC 13.2) for unit metrics; WSL Ubuntu
   `scan → redact → scan` CLI round-trip exits 2, then 0; the 4 clean
   cases in that run produced zero findings, and the full 20-case clean
   corpus is covered at ground-truth level above.
-- Windows clipboard watch: verified reading a `CF_BITMAP`-only clipboard
-  image placed by another process and failing closed with a clear error
-  when Tesseract is not installed. Windows OCR end-to-end runs in CI
-  (the local machine could not install Tesseract without elevation).
+- Windows with Tesseract 5.4 installed: the OCR e2e test also reports
+  32/32 coverage with residual 0; a full CLI pass over the 60-case secret
+  corpus detects 60/60 and, after redaction, re-scans with residual 0/60
+  (scan p95 ≈ 0.54 s per image). Clipboard watch was verified end to end:
+  an image carrying an AWS key and an e-mail address placed by another
+  process was intercepted, redacted in 373 ms, logged with the foreground
+  application, and the clipboard afterwards contained the redacted image.
 
 Re-run before every release and update this section with the date and
 environment; a metric that regresses below target blocks the release.

@@ -51,7 +51,11 @@ struct TempFiles {
 // code, or -1 when the process could not be started.
 [[nodiscard]] int run_capture(const std::string& command, std::string& captured) {
 #if defined(_WIN32)
-    FILE* pipe = _popen(command.c_str(), "rb");
+    // cmd.exe /c strips the first and last quote characters when a command
+    // contains several quoted parts (paths with spaces, e.g. under
+    // "Program Files"). An extra outer pair of quotes preserves them.
+    const std::string wrapped = '"' + command + '"';
+    FILE* pipe = _popen(wrapped.c_str(), "rb");
 #else
     FILE* pipe = popen(command.c_str(), "r");
 #endif
@@ -145,7 +149,16 @@ struct TempFiles {
 }  // namespace
 
 TesseractCliOcrEngine::TesseractCliOcrEngine(std::filesystem::path executable)
-    : executable_(std::move(executable)) {}
+    : executable_(std::move(executable)) {
+    // The plain "tesseract" default resolves through the documented
+    // environment override so every construction site behaves the same.
+    if (executable_ == std::filesystem::path("tesseract")) {
+        if (const char* from_env = std::getenv("SECRETSIMAGE_TESSERACT");
+            from_env != nullptr && from_env[0] != '\0') {
+            executable_ = from_env;
+        }
+    }
+}
 
 bool TesseractCliOcrEngine::is_available() {
     if (available_cached_ >= 0) return available_cached_ == 1;

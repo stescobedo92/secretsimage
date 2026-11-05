@@ -128,6 +128,14 @@ TEST_CASE("detector de-duplicates overlapping pattern hits") {
     CHECK_MSG(findings.size() == 1, "labelled + GitHub rules collapse into one finding");
 }
 
+TEST_CASE("detector rejoins vendor tokens whose underscore OCR read as space") {
+    // Observed against Tesseract 5.4: "ghp_<36>" arrived as three fragments.
+    CHECK(has_kind(detect("export GITHUB TOKEN=ghp Dox78GY1B2Hka38daoV8BFP pYHm0g4YQ4PLF done"),
+                   SecretKind::kGitHubToken));
+    CHECK(detect("the ghp report is ready for the team meeting today").empty());
+    CHECK(detect("ghp documentation covers everything needed for onboarding").empty());
+}
+
 TEST_CASE("detector handles OCR-split IPv6 and spaced URIs") {
     const std::vector<Finding> ipv6 = detect("ipv6 peer 2001: db8:85a3:21c0::5da dropped");
     CHECK(has_kind(ipv6, SecretKind::kIpv6));

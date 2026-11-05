@@ -295,6 +295,96 @@ struct Candidate {
     return shannon_entropy_bits_per_char(token) >= config.high_entropy_min_bits_per_char;
 }
 
+// OCR turns underscores into spaces and splits long tokens into fragments
+// ("ghp_ABC..." arrives as "ghp ABC DEF..."). For the closed set of vendor
+// prefixes, a hand-rolled scanner tolerates a few single spaces inside the
+// token and an underscore read as a space. The spaced path additionally
+// requires a digit in the payload so prose starting with the same letters
+// is not swallowed. The contiguous regexes above remain the primary path.
+struct SpacedTokenSpec {
+    SecretKind kind;
+    const char* prefix;      // '_' in the prefix matches '_' or ' '
+    std::size_t min_payload; // payload characters, spaces excluded
+    std::size_t max_payload;
+    bool (*payload_char)(char) noexcept;
+};
+
+[[nodiscard]] bool is_alnum_char(char ch) noexcept {
+    return (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
+}
+[[nodiscard]] bool is_upper_alnum_char(char ch) noexcept {
+    return (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z');
+}
+[[nodiscard]] bool is_b64url_char(char ch) noexcept {
+    return is_alnum_char(ch) || ch == '_' || ch == '-';
+}
+[[nodiscard]] bool is_pat_char(char ch) noexcept { return is_alnum_char(ch) || ch == '_'; }
+[[nodiscard]] bool is_slack_char(char ch) noexcept { return is_alnum_char(ch) || ch == '-'; }
+
+void scan_spaced_tokens(const LineWords& line, std::vector<Candidate>& out) {
+    static constexpr SpacedTokenSpec kSpecs[] = {
+        {SecretKind::kGitHubToken, "ghp_", 36, 80, &is_alnum_char},
+        {SecretKind::kGitHubToken, "gho_", 36, 80, &is_alnum_char},
+        {SecretKind::kGitHubToken, "ghu_", 36, 80, &is_alnum_char},
+        {SecretKind::kGitHubToken, "ghs_", 36, 80, &is_alnum_char},
+        {SecretKind::kGitHubToken, "ghr_", 36, 80, &is_alnum_char},
+        {SecretKind::kGitHubToken, "github_pat_", 22, 120, &is_pat_char},
+        {SecretKind::kAwsAccessKey, "AKIA", 16, 16, &is_upper_alnum_char},
+        {SecretKind::kAwsAccessKey, "ASIA", 16, 16, &is_upper_alnum_char},
+        {SecretKind::kGcpApiKey, "AIza", 35, 35, &is_b64url_char},
+        {SecretKind::kSlackToken, "xoxb-", 10, 100, &is_slack_char},
+        {SecretKind::kSlackToken, "xoxa-", 10, 100, &is_slack_char},
+        {SecretKind::kSlackToken, "xoxp-", 10, 100, &is_slack_char},
+        {SecretKind::kSlackToken, "xoxr-", 10, 100, &is_slack_char},
+        {SecretKind::kSlackToken, "xoxs-", 10, 100, &is_slack_char},
+    };
+    const std::string& text = line.text;
+    for (const SpacedTokenSpec& spec : kSpecs) {
+        const std::string_view prefix(spec.prefix);
+        // Find candidate starts by the first two literal characters.
+        for (std::size_t start = 0; start + prefix.size() <= text.size(); ++start) {
+            if (text[start] != prefix[0] || text[start + 1] != prefix[1]) continue;
+            if (start > 0 && is_alnum_char(text[start - 1])) continue;
+            std::size_t pos = start;
+            bool prefix_ok = true;
+            for (char expected : prefix) {
+                const char actual = text[pos];
+                if (expected == '_' || expected == '-') {
+                    if (actual != expected && actual != ' ') { prefix_ok = false; break; }
+                } else if (actual != expected) {
+                    prefix_ok = false;
+                    break;
+                }
+                ++pos;
+            }
+            if (!prefix_ok) continue;
+            std::size_t payload = 0;
+            int spaces = 0;
+            bool has_digit = false;
+            std::size_t end = pos;
+            while (end < text.size()) {
+                const char ch = text[end];
+                if (spec.payload_char(ch)) {
+                    ++payload;
+                    if (is_digit(ch)) has_digit = true;
+                    ++end;
+                } else if (ch == ' ' && spaces < 3 && end + 1 < text.size() &&
+                           spec.payload_char(text[end + 1])) {
+                    ++spaces;
+                    ++end;
+                } else {
+                    break;
+                }
+                if (payload > spec.max_payload) break;
+            }
+            if (payload >= spec.min_payload && payload <= spec.max_payload && has_digit &&
+                spaces > 0) {
+                out.push_back(Candidate{spec.kind, start, end});
+            }
+        }
+    }
+}
+
 void scan_validated_patterns(const LineWords& line, const DetectorConfig& config,
                              std::vector<Candidate>& out) {
     static const std::regex kEmail(R"(\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b)");
@@ -359,6 +449,7 @@ void scan_validated_patterns(const LineWords& line, const DetectorConfig& config
             return high_entropy_acceptable(text, config);
         });
     }
+    scan_spaced_tokens(line, out);
 }
 
 // OCR sometimes inserts a space inside a long token. For lines carrying a

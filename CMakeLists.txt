@@ -142,6 +142,21 @@ if(SECRETSIMAGE_BUILD_TESTS)
     set_tests_properties(ocr_e2e PROPERTIES LABELS "ocr;requires-ocr" TIMEOUT 300)
 endif()
 
+# MinGW-built distribution executables statically link the GCC runtime so
+# a foreign libstdc++/libgcc earlier on PATH (for example inside a
+# Tesseract install directory) can never be picked up instead of the
+# toolchain runtime. Debug is excluded: unoptimized MinGW objects emit a
+# strong std::type_info symbol that collides with the static library.
+if(MINGW)
+    foreach(_exe secretsimage gen_synthetic secretsimage_tests)
+        if(TARGET ${_exe})
+            target_link_options(${_exe} PRIVATE
+                $<$<NOT:$<CONFIG:Debug>>:-static-libgcc>
+                $<$<NOT:$<CONFIG:Debug>>:-static-libstdc++>)
+        endif()
+    endforeach()
+endif()
+
 # ---------------------------------------------------------------------------
 # Install / packaging
 # ---------------------------------------------------------------------------
