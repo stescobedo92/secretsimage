@@ -41,7 +41,8 @@ void print_usage(std::ostream& out) {
            "  --padding <px>               solid-fill margin around findings (default 4)\n"
            "  --no-high-entropy            disable the generic high-entropy token rule\n"
            "\n"
-           "Requires Tesseract OCR on PATH (or set SECRETSIMAGE_TESSERACT to its path).\n"
+           "Requires Tesseract OCR on PATH or in a standard install location\n"
+           "(or set SECRETSIMAGE_TESSERACT to its path).\n"
            "Audit reports never contain secret values, only kind, box and length.\n";
 }
 
@@ -220,6 +221,13 @@ int run_watch(ParsedArgs& args) {
         return 1;
     }
     auto ocr = make_default_ocr_engine();
+    if (!ocr->is_available()) {
+        // Fail fast: a watcher that can never OCR would leave every copied
+        // image untouched while looking healthy.
+        std::cerr << "error: tesseract executable was not found (install Tesseract OCR, add it "
+                     "to PATH, or set SECRETSIMAGE_TESSERACT to its full path)\n";
+        return 1;
+    }
     WatchOptions options;
     options.pipeline = args.pipeline;
     options.audit_log_path = args.audit_log;

@@ -135,6 +135,53 @@ struct TempFiles {
     return scaled;
 }
 
+[[nodiscard]] std::filesystem::path standard_candidate(const std::filesystem::path& root) {
+#if defined(_WIN32)
+    return root / "Tesseract-OCR" / "tesseract.exe";
+#else
+    return root / "bin" / "tesseract";
+#endif
+}
+
+// Install prefixes probed when the bare `tesseract` name does not resolve
+// through PATH. On Windows these come only from the machine/user program
+// directory variables -- never the working directory -- so a stray
+// executable next to the input images cannot be picked up.
+[[nodiscard]] std::vector<std::filesystem::path> standard_tesseract_roots() {
+    std::vector<std::filesystem::path> roots;
+    auto add_env = [&roots](const char* name, const char* suffix = nullptr) {
+        const char* value = std::getenv(name);
+        if (value == nullptr || value[0] == '\0') return;
+        std::filesystem::path root(value);
+        if (suffix != nullptr) root /= suffix;
+        if (std::find(roots.begin(), roots.end(), root) == roots.end()) {
+            roots.push_back(std::move(root));
+        }
+    };
+#if defined(_WIN32)
+    add_env("ProgramFiles");
+    add_env("ProgramW6432");
+    add_env("ProgramFiles(x86)");
+    add_env("LOCALAPPDATA", "Programs");
+#else
+    static_cast<void>(add_env);
+    roots = {"/usr/local", "/opt/homebrew", "/usr"};
+#endif
+    return roots;
+}
+
+[[nodiscard]] bool responds_to_version(const std::filesystem::path& executable) {
+    const std::string exe = executable.string();
+    if (!quote_safe(exe)) return false;
+    std::string out;
+#if defined(_WIN32)
+    const std::string sink = " 2>NUL";
+#else
+    const std::string sink = " 2>/dev/null";
+#endif
+    return run_capture(quoted(executable) + " --version" + sink, out) == 0;
+}
+
 [[nodiscard]] int clamp_upscale_factor(const Image& image, int requested) noexcept {
     int factor = std::clamp(requested, 1, 4);
     while (factor > 1) {
@@ -160,19 +207,34 @@ TesseractCliOcrEngine::TesseractCliOcrEngine(std::filesystem::path executable)
     }
 }
 
+std::filesystem::path find_standard_tesseract(const std::vector<std::filesystem::path>& roots) {
+    for (const std::filesystem::path& root : roots) {
+        if (root.empty()) continue;
+        const std::filesystem::path candidate = standard_candidate(root);
+        std::error_code ec;
+        if (std::filesystem::is_regular_file(candidate, ec)) return candidate;
+    }
+    return {};
+}
+
 bool TesseractCliOcrEngine::is_available() {
     if (available_cached_ >= 0) return available_cached_ == 1;
-    std::string out;
-    const std::string exe = executable_.string();
-#if defined(_WIN32)
-    const std::string sink = " 2>NUL";
-#else
-    const std::string sink = " 2>/dev/null";
-#endif
-    const int code =
-        quote_safe(exe) ? run_capture(quoted(executable_) + " --version" + sink, out) : -1;
-    available_cached_ = code == 0 ? 1 : 0;
-    return available_cached_ == 1;
+    bool available = responds_to_version(executable_);
+    if (!available && executable_ == std::filesystem::path("tesseract")) {
+        // Bare default name and PATH missed: standard installer locations
+        // are the last resort. Each root is validated separately so a
+        // broken install in an earlier root cannot shadow a working one.
+        for (const std::filesystem::path& root : standard_tesseract_roots()) {
+            const std::filesystem::path candidate = find_standard_tesseract({root});
+            if (!candidate.empty() && responds_to_version(candidate)) {
+                executable_ = candidate;
+                available = true;
+                break;
+            }
+        }
+    }
+    available_cached_ = available ? 1 : 0;
+    return available;
 }
 
 Result<OcrResult> TesseractCliOcrEngine::recognize(const Image& image, const OcrOptions& options) {
@@ -183,7 +245,8 @@ Result<OcrResult> TesseractCliOcrEngine::recognize(const Image& image, const Ocr
         return failure(ErrorCode::kOcrUnavailable,
                        "tesseract executable was not found or did not run: " +
                            executable_.string() +
-                           " (install Tesseract OCR and ensure it is on PATH)");
+                           " (install Tesseract OCR, add it to PATH, or set "
+                           "SECRETSIMAGE_TESSERACT to its full path)");
     }
     if (!quote_safe(options.language) || options.language.size() > 32) {
         return failure(ErrorCode::kInvalidArgument, "invalid OCR language option");

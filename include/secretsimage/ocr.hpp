@@ -52,6 +52,10 @@ class IOcrEngine {
     [[nodiscard]] virtual Result<OcrResult> recognize(const Image& image,
                                                       const OcrOptions& options) = 0;
     [[nodiscard]] virtual std::string name() const = 0;
+    // Whether the engine can run at all (e.g. its external program exists).
+    // Long-running callers check this once at startup and fail fast instead
+    // of reporting the same error for every image.
+    [[nodiscard]] virtual bool is_available() { return true; }
 
   protected:
     IOcrEngine() = default;
@@ -62,6 +66,12 @@ class IOcrEngine {
 // macOS, and isolates native OCR crashes from the host process. The engine
 // only ever invokes a fixed argument vector on a temporary file it created
 // itself, so no user input reaches a shell.
+//
+// Executable resolution for the default `"tesseract"` name, in order: the
+// `SECRETSIMAGE_TESSERACT` environment override, `PATH`, then the standard
+// install locations of the platform installers (on Windows the UB Mannheim
+// installer does not add itself to `PATH` unless asked). An explicitly
+// passed executable is used as-is with no fallback.
 class TesseractCliOcrEngine final : public IOcrEngine {
   public:
     explicit TesseractCliOcrEngine(std::filesystem::path executable = "tesseract");
@@ -71,7 +81,7 @@ class TesseractCliOcrEngine final : public IOcrEngine {
     [[nodiscard]] std::string name() const override { return "tesseract-cli"; }
 
     // Checks the executable responds to `--version`. The result is cached.
-    [[nodiscard]] bool is_available();
+    [[nodiscard]] bool is_available() override;
 
   private:
     std::filesystem::path executable_;
@@ -79,6 +89,13 @@ class TesseractCliOcrEngine final : public IOcrEngine {
 };
 
 [[nodiscard]] std::unique_ptr<IOcrEngine> make_default_ocr_engine();
+
+// First standard-install Tesseract executable found under `roots`, or an
+// empty path. Each root is an install prefix, probed as
+// `<root>/Tesseract-OCR/tesseract.exe` on Windows and `<root>/bin/tesseract`
+// elsewhere. Exposed for unit testing.
+[[nodiscard]] std::filesystem::path find_standard_tesseract(
+    const std::vector<std::filesystem::path>& roots);
 
 // Parses Tesseract TSV output into words. Exposed for unit testing.
 [[nodiscard]] Result<OcrResult> parse_tesseract_tsv(const std::string& tsv, int image_width,

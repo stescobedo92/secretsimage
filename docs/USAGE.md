@@ -11,8 +11,11 @@ Tesseract OCR is the only runtime dependency.
 | macOS | `brew install tesseract` |
 | Windows | `choco install tesseract` (or the UB Mannheim installer) |
 
-If `tesseract` is not on `PATH`, point `SECRETSIMAGE_TESSERACT` at the
-executable. Build requirements: CMake 3.20+ and a C++23 compiler
+The executable is resolved in this order: `SECRETSIMAGE_TESSERACT` (if
+set), `PATH`, then the standard installer locations (`%ProgramFiles%`,
+`%ProgramFiles(x86)%` and `%LOCALAPPDATA%\Programs` on Windows — the UB
+Mannheim installer does not touch `PATH` unless asked — and `/usr/local`,
+`/opt/homebrew`, `/usr` elsewhere). Build requirements: CMake 3.20+ and a C++23 compiler
 (GCC 13+, Clang 16+, MSVC from Visual Studio 2022, Apple Clang 15+).
 
 ```sh
@@ -82,9 +85,12 @@ the redacted images and audit reports as artifacts; add
 
 ## Troubleshooting
 
-- **"tesseract executable was not found"** — install Tesseract or set
-  `SECRETSIMAGE_TESSERACT`. In watch mode the clipboard is left untouched
-  (fail-closed) and the error is printed once per new image.
+- **"tesseract executable was not found"** — install Tesseract, add it to
+  `PATH`, or set `SECRETSIMAGE_TESSERACT` to its full path. Standard
+  installer locations are probed automatically, so this only fires for
+  custom installs. Watch mode checks at startup and exits immediately
+  instead of running unprotected; if OCR fails on an individual image the
+  clipboard is left untouched and the error is printed once per new image.
 - **Nothing happens in watch mode on Linux** — check you are on X11 or
   XWayland (`echo $XDG_SESSION_TYPE`) and that the build found
   `libx11-dev`.
