@@ -1,9 +1,12 @@
 name: CI
 
+# Build + test on EVERY commit: any push to any branch and every pull request.
+# Tagged releases are handled separately by release.yml (SemVer tags vX.Y.Z).
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -19,7 +22,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact: linux-x86_64
+          - os: windows-latest
+            artifact: windows-x86_64
+          - os: macos-latest
+            artifact: macos-arm64
     steps:
       - uses: actions/checkout@v4
 
@@ -61,3 +70,17 @@ jobs:
         shell: bash
         run: |
           if [ -f build/secretsimage.exe ]; then ./build/secretsimage.exe version; else ./build/secretsimage version; fi
+
+      # Per-commit downloadable build (Actions > this run > Artifacts).
+      # Stable, versioned downloads live in GitHub Releases (release.yml).
+      - name: Upload per-commit build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: secretsimage-${{ matrix.artifact }}-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            build/secretsimage
+            build/secretsimage.exe
+            build/gen_synthetic
+            build/gen_synthetic.exe

@@ -101,6 +101,13 @@ add_executable(secretsimage apps/cli/main.cpp)
 target_link_libraries(secretsimage PRIVATE secretsimage::core)
 secretsimage_set_warnings(secretsimage)
 
+# App icon: embedded in the .exe on Windows; installed as a hicolor icon +
+# .desktop entry on Linux and as an .icns bundle resource file on macOS.
+# Artwork source: assets/icon.svg (see tools/assets/generate_icon.py).
+if(WIN32)
+    target_sources(secretsimage PRIVATE apps/cli/secretsimage.rc)
+endif()
+
 # ---------------------------------------------------------------------------
 # Synthetic corpus support + generator (reproducible tests PR-3 / PR-4)
 # ---------------------------------------------------------------------------
@@ -130,6 +137,7 @@ if(SECRETSIMAGE_BUILD_TESTS)
         tests/test_image_redactor.cpp
         tests/test_pipeline.cpp
         tests/test_metrics.cpp
+        tests/test_ocr_discovery.cpp
         tests/test_ocr_e2e.cpp
     )
     target_include_directories(secretsimage_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests")
@@ -165,6 +173,16 @@ if(SECRETSIMAGE_BUILD_TOOLS)
     install(TARGETS gen_synthetic RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 endif()
 install(FILES LICENSE README.md DESTINATION "${CMAKE_INSTALL_DATADIR}/secretsimage")
+install(FILES assets/icon.png assets/icon.svg DESTINATION "${CMAKE_INSTALL_DATADIR}/secretsimage")
+if(UNIX AND NOT APPLE)
+    install(FILES assets/icon.png
+            DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/512x512/apps"
+            RENAME secretsimage.png)
+    install(FILES assets/secretsimage.desktop
+            DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
+elseif(APPLE)
+    install(FILES assets/secretsimage.icns DESTINATION "${CMAKE_INSTALL_DATADIR}/secretsimage")
+endif()
 
 set(CPACK_PACKAGE_NAME "secretsimage")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")

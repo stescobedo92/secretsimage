@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="secretsimage icon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#112036"/>
+      <stop offset="1" stop-color="#070d1a"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#bg)"/>
+  <!-- Screenshot window -->
+  <rect x="96" y="110" width="320" height="270" rx="26" fill="none" stroke="#e2eef8" stroke-width="14"/>
+  <line x1="96" y1="176" x2="416" y2="176" stroke="#e2eef8" stroke-width="10"/>
+  <circle cx="132" cy="143" r="11" fill="#dc2626"/>
+  <circle cx="174" cy="143" r="11" fill="#f5c542"/>
+  <circle cx="216" cy="143" r="11" fill="#22c55e"/>
+  <!-- Sun and mountains -->
+  <circle cx="356" cy="231" r="26" fill="#f5c542"/>
+  <polygon points="112,364 215,240 300,364" fill="#0d786e"/>
+  <polygon points="235,364 325,262 400,364" fill="#14b8a6"/>
+  <!-- Solid redaction bar: irreversible, never blur -->
+  <g transform="rotate(-7 256 324)">
+    <rect x="70" y="292" width="372" height="64" rx="14" fill="#08080a" stroke="#dc2626" stroke-width="6"/>
+  </g>
+</svg>

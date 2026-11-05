@@ -101,12 +101,16 @@ jobs:
           done
           cp LICENSE README.md CHANGELOG.md SECURITY.md "dist/${stage}/"
           cp -r docs "dist/${stage}/docs"
+          mkdir -p "dist/${stage}/assets"
+          cp assets/icon.png "dist/${stage}/assets/" 2>/dev/null || true
           if [ "${{ runner.os }}" = "Windows" ]; then
-            (cd dist && 7z a "${stage}.zip" "${stage}")
+            archive="${stage}.zip"
+            (cd dist && 7z a "${archive}" "${stage}")
           else
-            (cd dist && tar -czf "${stage}.tar.gz" "${stage}")
+            archive="${stage}.tar.gz"
+            (cd dist && tar -czf "${archive}" "${stage}")
           fi
-          (cd dist && (sha256sum ${stage}.* > "${stage}.sha256" 2>/dev/null || shasum -a 256 ${stage}.* > "${stage}.sha256"))
+          (cd dist && (sha256sum "${archive}" > "${archive}.sha256" 2>/dev/null || shasum -a 256 "${archive}" > "${archive}.sha256"))
 
       - uses: actions/upload-artifact@v4
         with:
@@ -128,8 +132,35 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: secretsimage ${{ needs.verify-version.outputs.version }}
+          draft: false
+          prerelease: false
           generate_release_notes: true
           fail_on_unmatched_files: true
+          body: |
+            ## Download
+
+            | Platform | Asset |
+            |---|---|
+            | Windows (x86_64) | `secretsimage-${{ needs.verify-version.outputs.version }}-windows-x86_64.zip` |
+            | Linux (x86_64) | `secretsimage-${{ needs.verify-version.outputs.version }}-linux-x86_64.tar.gz` |
+            | macOS (arm64) | `secretsimage-${{ needs.verify-version.outputs.version }}-macos-arm64.tar.gz` |
+
+            Verify downloads with the matching `*.sha256` file.
+
+            ## Requirements
+
+            [Tesseract OCR](https://tesseract-ocr.github.io/) must be installed
+            (`apt install tesseract-ocr`, `brew install tesseract`,
+            `choco install tesseract`). It is found on `PATH` or in standard
+            installer locations; set `SECRETSIMAGE_TESSERACT` for custom installs.
+
+            ## Quick start
+
+            ```sh
+            secretsimage watch                       # redact clipboard screenshots before paste
+            secretsimage redact shot.png -o shot.redacted.png
+            secretsimage scan docs/images/*.png      # CI gate (exit 2 if secrets found)
+            ```
           files: |
             dist/*.zip
             dist/*.tar.gz

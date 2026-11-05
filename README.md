@@ -1,6 +1,19 @@
-# secretsimage
+<p align="center">
+  <img src="assets/icon.png" width="160" height="160" alt="secretsimage icon">
+</p>
 
-Automatic, irreversible redaction of secrets and personal data in screenshots.
+<h1 align="center">secretsimage</h1>
+
+<p align="center">
+  Automatic, irreversible redaction of secrets and personal data in screenshots.
+</p>
+
+<p align="center">
+  <a href="https://github.com/stescobedo92/secretsimage/actions/workflows/ci.yml"><img src="https://github.com/stescobedo92/secretsimage/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI"></a>
+  <a href="https://github.com/stescobedo92/secretsimage/releases/latest"><img src="https://img.shields.io/github/v/release/stescobedo92/secretsimage" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/stescobedo92/secretsimage" alt="License: GPL-3.0"></a>
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue" alt="Windows | Linux | macOS">
+</p>
 
 Screenshots get pasted into Jira, Slack, Teams, Word documents and pull
 requests with tokens, connection strings, e-mail addresses, internal IPs and
@@ -10,6 +23,37 @@ credential costs hours. `secretsimage` sits between the screenshot and the
 paste: it OCRs the image, finds sensitive regions, covers them with a
 **solid fill** (never blur, which is reversible), and writes an audit log of
 what was covered. The audit log never contains the secret values themselves.
+
+## Before / after
+
+![A screenshot full of fake example secrets, then the same screenshot after secretsimage redacted it](docs/images/before-after.png)
+
+The left panel is a synthetic screenshot with fake example data (the AWS
+documentation key, a sequential placeholder token, an `@example.com`
+address). The right panel is the unedited output of
+`secretsimage redact` on it: six findings — AWS key, high-entropy secret,
+GitHub token, password, e-mail and private IP — covered with solid fill,
+while clean text stays readable. A second `secretsimage scan` of the
+redacted image finds nothing. Individual panels:
+[before](docs/images/screenshot-before.png) ·
+[after](docs/images/screenshot-after.png). Regenerate them with
+`python tools/assets/generate_screenshots.py`.
+
+## Download
+
+Prebuilt binaries for **Windows (x86_64)**, **Linux (x86_64)** and
+**macOS (arm64)** are published on the
+[Releases page](https://github.com/stescobedo92/secretsimage/releases/latest)
+with SHA-256 checksums. Releases follow
+[Semantic Versioning](https://semver.org/): pushing a `vMAJOR.MINOR.PATCH`
+tag that matches `CMakeLists.txt` and `CHANGELOG.md` builds, tests and
+publishes all three platforms. Every other commit is built and tested by
+CI on the same three OSes, and the binaries are kept as run artifacts.
+
+The only runtime dependency is
+[Tesseract OCR](https://tesseract-ocr.github.io/)
+(`apt install tesseract-ocr`, `brew install tesseract`,
+`choco install tesseract`).
 
 ## Modes
 
@@ -36,9 +80,11 @@ UUIDs, times and version numbers are deliberately left alone; see
 ## Quick start
 
 Prerequisites: a C++23 compiler, CMake 3.20+, and
-[Tesseract OCR](https://tesseract-ocr.github.io/) on your `PATH`
+[Tesseract OCR](https://tesseract-ocr.github.io/)
 (`apt install tesseract-ocr`, `brew install tesseract`, or
-`choco install tesseract`). On Linux, clipboard watch mode additionally
+`choco install tesseract`). It is found on `PATH` or in the standard
+installer locations (e.g. `C:\Program Files\Tesseract-OCR`); set
+`SECRETSIMAGE_TESSERACT` for custom installs. On Linux, clipboard watch mode additionally
 needs X11 headers at build time (`libx11-dev`).
 
 ```sh
