@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr libx11-dev ninja-build
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install tesseract ninja
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install -y tesseract ninja
+          "C:\Program Files\Tesseract-OCR" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          "SECRETSIMAGE_TESSERACT=C:\Program Files\Tesseract-OCR\tesseract.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Set up MSVC environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build -j 4
+
+      - name: Unit tests and metrics gate
+        run: ctest --test-dir build -L unit --output-on-failure
+
+      - name: OCR end-to-end tests (real Tesseract)
+        run: ctest --test-dir build -L ocr --output-on-failure
+
+      - name: CLI smoke test
+        shell: bash
+        run: |
+          if [ -f build/secretsimage.exe ]; then ./build/secretsimage.exe version; else ./build/secretsimage version; fi
