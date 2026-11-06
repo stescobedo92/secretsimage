@@ -96,9 +96,11 @@ jobs:
         run: |
           stage="secretsimage-${VERSION}-${ARTIFACT}"
           mkdir -p "dist/${stage}"
-          for exe in secretsimage gen_synthetic; do
-            if [ -f "build/${exe}.exe" ]; then cp "build/${exe}.exe" "dist/${stage}/"; else cp "build/${exe}" "dist/${stage}/"; fi
-          done
+          # End-user archives ship only the app itself. gen_synthetic is a
+          # test-corpus development tool (it embeds fake credential strings
+          # by design); it stays available in per-commit CI artifacts and
+          # from source builds, not in releases end users install.
+          if [ -f "build/secretsimage.exe" ]; then cp "build/secretsimage.exe" "dist/${stage}/"; else cp "build/secretsimage" "dist/${stage}/"; fi
           cp LICENSE README.md CHANGELOG.md SECURITY.md "dist/${stage}/"
           cp -r docs "dist/${stage}/docs"
           mkdir -p "dist/${stage}/assets"

@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.20)
 # Single source of truth for the Semantic Version. The release workflow
 # verifies that the pushed tag (vMAJOR.MINOR.PATCH) matches this value.
 project(secretsimage
-    VERSION 0.1.0
+    VERSION 0.1.1
     DESCRIPTION "Automatic redaction of secrets and personal data in screenshots"
     LANGUAGES CXX)
 
@@ -101,11 +101,16 @@ add_executable(secretsimage apps/cli/main.cpp)
 target_link_libraries(secretsimage PRIVATE secretsimage::core)
 secretsimage_set_warnings(secretsimage)
 
-# App icon: embedded in the .exe on Windows; installed as a hicolor icon +
-# .desktop entry on Linux and as an .icns bundle resource file on macOS.
-# Artwork source: assets/icon.svg (see tools/assets/generate_icon.py).
+# App icon and version metadata: on Windows both are embedded in the .exe
+# via a generated .rc (icon + VERSIONINFO from the project version); the
+# icon is installed as a hicolor icon + .desktop entry on Linux and as an
+# .icns file on macOS. Artwork: assets/icon.svg (tools/assets/generate_icon.py).
 if(WIN32)
-    target_sources(secretsimage PRIVATE apps/cli/secretsimage.rc)
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/secretsimage.rc.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/generated/secretsimage.rc"
+        @ONLY)
+    target_sources(secretsimage PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated/secretsimage.rc")
 endif()
 
 # ---------------------------------------------------------------------------

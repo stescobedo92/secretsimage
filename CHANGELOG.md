@@ -6,6 +6,21 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-06
+
+### Changed
+
+- Windows executable now carries complete VERSIONINFO metadata (product,
+  company, file/product version, description, copyright) generated from
+  the project version alongside the embedded icon. Unsigned binaries with
+  blank version metadata are a classic Microsoft Defender ML
+  false-positive trigger; the 0.1.0 package was flagged this way during
+  winget Installation Validation even though signature scans are clean.
+- End-user release archives no longer bundle `gen_synthetic`. It is a
+  test-corpus development tool that embeds fake credential strings by
+  design; it remains available in per-commit CI artifacts and from source
+  builds (`SECRETSIMAGE_BUILD_TOOLS`).
+
 ## [0.1.0] - 2026-11-05
 
 ### Added
